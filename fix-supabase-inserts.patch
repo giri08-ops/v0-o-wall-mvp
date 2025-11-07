@@ -1,0 +1,99 @@
+diff --git a/app/api/auth.ts b/app/api/auth.ts
+index 0000000..0000000 100644
+--- a/app/api/auth.ts
++++ b/app/api/auth.ts
+@@
+ // /app/api/auth.ts
+ import { supabase } from '@/lib/supabaseClient';
+ import type { Database } from '@/lib/supabaseTypes';
+@@
+ export async function signup(email: string, password: string) {
+	 // Step 1: Signup user with Supabase Auth
+	 const { data, error } = await supabase.auth.signUp({ email, password });
+	 if (error) throw error;
+
+	 // Step 2: Insert user record into public.users table
+	 const user = data.user;
+	 if (user) {
+		 const { error: insertError } = await (supabase as any)
+			 .from('users')
+			 .insert([
+				 {
+					 id: user.id,
+					 created_at: new Date().toISOString(),
+				 },
+			 ]);
+
+		 if (insertError && !insertError.message.includes('duplicate key')) {
+			 console.error('Error creating user record:', insertError.message);
+		 }
+	 }
+
+	 return data;
+ }
+
+@@
+ export async function getUser() {
+	 const { data, error } = await supabase.auth.getUser();
+	 if (error) throw error;
+	 return data.user;
+ }
+
+diff --git a/app/api/testSupabase/route.ts b/app/api/testSupabase/route.ts
+index 0000000..0000000 100644
+--- a/app/api/testSupabase/route.ts
++++ b/app/api/testSupabase/route.ts
+@@
+ import { NextResponse } from 'next/server';
+ import { supabase } from '@/lib/supabaseClient';
+ import type { Database } from '@/lib/supabaseTypes';
+@@
+ // Sample user for testing - match the table structure exactly
+ const SAMPLE_USER = {
+	 id: crypto.randomUUID(), // generate a unique ID
+	 created_at: new Date().toISOString()
+	 // Note: removed email as it's not in the table structure yet
+ };
+@@
+	 if (!data || data.length === 0) {
+		 const { data: insertedData, error: insertError } = await (supabase as any)
+			 .from('users')
+			 .insert([SAMPLE_USER])
+			 .select();
+
+		 if (insertError) {
+			 return NextResponse.json({ error: insertError.message }, { status: 400 });
+		 }
+		 data = insertedData;
+	 }
+
+diff --git a/app/api/uploadReceipt.ts b/app/api/uploadReceipt.ts
+index 0000000..0000000 100644
+--- a/app/api/uploadReceipt.ts
++++ b/app/api/uploadReceipt.ts
+@@
+ import { supabase } from '@/lib/supabaseClient';
+ import { detectTextFromImage } from '@/lib/googleVisionClient';
+ import type { Json, Database } from '@/lib/supabaseTypes';
+@@
+	 // Step 5 — Insert into DB
+	 const { data: receipt, error: insertError } = await (supabase as any)
+		 .from('receipts')
+		 .insert([
+			 {
+				 user_id: userId,
+				 image_url: imageUrl,
+				 total,
+				 parsed_total: parsed.total ?? null,
+				 parsed_date: parsed.date ?? null,
+				 merchant: parsed.merchant ?? null,
+				 // store OCR text as JSON string or object depending on detectTextFromImage
+				 ocr_text: (typeof ocrText === 'string' ? ocrText : JSON.stringify(ocrText)) as unknown as Json,
+				 status: validation.status,
+				 validation_flags: validation.flags,
+			 },
+		 ])
+		 .select()
+		 .single();
+
+*** End Patch
